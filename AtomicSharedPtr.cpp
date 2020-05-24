@@ -167,17 +167,22 @@ void run_test() {
         task.join();
     }
 
-    for (size_t reader = 0; reader < reader_count; ++reader) {
-        std::cout << "Reader " << reader << " :";
-        for (size_t writer = 0; writer <= writer_count; ++writer) {
-            std::cout << " " << 100.0 * sums[reader][writer] / iterations << "% (" << sums[reader][writer] << ")";
-        }
-        std::cout << "\n";
-    }
+    //for (size_t reader = 0; reader < reader_count; ++reader) {
+    //    std::cout << "Reader " << reader << " :";
+    //    for (size_t writer = 0; writer <= writer_count; ++writer) {
+    //        std::cout << " " << 100.0 * sums[reader][writer] / iterations << "% (" << sums[reader][writer] << ")";
+    //    }
+    //    std::cout << "\n";
+    //}
 }
 
 int main()
 {
+    std::cout << "regular shared_ptr impl\n";
+    run_test<std::shared_ptr>();
+    run_test<std::shared_ptr>();
+    run_test<std::shared_ptr>();
+
     std::cout << "mutex impl\n";
     run_test<naive_atomic_shared_ptr_with_mutex>();
     run_test<naive_atomic_shared_ptr_with_mutex>();
