@@ -6,7 +6,6 @@
 #include <mutex>
 #include <array>
 
-
 template <typename T>
 class naive_atomic_shared_ptr_with_mutex {
 public:
@@ -29,6 +28,25 @@ private:
     mutable std::mutex mutex;
     std::shared_ptr<T> pointer;
 };
+
+template <typename T>
+class atomic_shared_ptr_using_std_atomic {
+public:
+    atomic_shared_ptr_using_std_atomic(const std::shared_ptr<T>& p) :pointer(p) {}
+
+    atomic_shared_ptr_using_std_atomic& operator=(const std::shared_ptr<T>& p) {
+        std::atomic_store(&pointer, p);
+        return *this;
+    }
+
+    operator std::shared_ptr<T>() const {
+        return std::atomic_load(&pointer);
+    }
+
+private:
+    std::shared_ptr<T> pointer;
+};
+
 
 constexpr int under_construction_label = std::numeric_limits<int>::max() / 2;
 
@@ -164,6 +182,11 @@ int main()
     run_test<naive_atomic_shared_ptr_with_mutex>();
     run_test<naive_atomic_shared_ptr_with_mutex>();
     run_test<naive_atomic_shared_ptr_with_mutex>();
+
+    std::cout << "std::atomic impl\n";
+    run_test<atomic_shared_ptr_using_std_atomic>();
+    run_test<atomic_shared_ptr_using_std_atomic>();
+    run_test<atomic_shared_ptr_using_std_atomic>();
 
     std::cout << "ring impl\n";
     run_test<atomic_shared_ptr_with_ring>();
