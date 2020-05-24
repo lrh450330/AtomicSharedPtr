@@ -2,19 +2,88 @@
 //
 
 #include <iostream>
+#include <memory>
+#include <thread>
+#include <atomic>
+#include <chrono>
+#include <mutex>
+
+template <typename T>
+class naive_atomic_shared_ptr_with_mutex {
+public:
+    naive_atomic_shared_ptr_with_mutex(std::shared_ptr<T> p) :pointer(p) {}
+
+    naive_atomic_shared_ptr_with_mutex& operator=(std::shared_ptr<T> p) {
+        {
+            std::lock_guard guard(mutex);
+            pointer = p;
+        }
+        return *this;
+    }
+
+    operator std::shared_ptr<T>() const {
+        std::lock_guard guard(mutex);
+        return pointer;
+    }
+
+private:
+    mutable std::mutex mutex;
+    std::shared_ptr<T> pointer;
+};
+
+template <typename T>
+using atomic_shared_ptr = naive_atomic_shared_ptr_with_mutex<T>;
+
+const size_t reader_count = 4;
+const size_t writer_count = 4;
+const size_t iterations = 10000000;
 
 int main()
 {
-    std::cout << "Hello World!\n";
+    atomic_shared_ptr<size_t> shared_ptr = std::make_shared<size_t>(0);
+
+    std::vector<std::thread> readers(reader_count);
+    std::vector<std::thread> writers(writer_count);
+
+    size_t sums[reader_count][writer_count + 1] = { 0 };
+
+    auto start = std::chrono::steady_clock::now();
+
+    for (size_t reader = 0; reader < reader_count; ++reader) {
+        readers[reader] = std::thread([&shared_ptr, &sums = sums[reader]]() {
+            for (size_t i = 0; i < iterations; ++i) {
+                std::shared_ptr<size_t> local_ptr = shared_ptr;
+                sums[*local_ptr]++;
+            }
+        });
+    }
+
+    for (size_t writer = 0; writer < writer_count; ++writer) {
+        writers[writer] = std::thread([&shared_ptr, writer]() {
+            auto local = std::make_shared<size_t>(writer + 1);
+            for (size_t i = 0; i < iterations; ++i) {
+                shared_ptr = local;
+            }
+        });
+    }
+
+    for (auto tasks_ptr : { &readers, &writers }) {
+        for (auto& task : *tasks_ptr) {
+            task.join();
+        }
+    }
+
+    auto end = std::chrono::steady_clock::now();
+
+    std::cout << iterations << " done in " <<
+        std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " ms\n";
+
+    for (size_t reader = 0; reader < reader_count; ++reader) {
+        std::cout << "Reader " << reader << " :";
+        for (size_t writer = 0; writer <= writer_count; ++writer) {
+            std::cout << " " << 100.0 * sums[reader][writer] / iterations << "% (" << sums[reader][writer] << ")";
+        }
+        std::cout << "\n";
+    }
 }
 
-// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-// Debug program: F5 or Debug > Start Debugging menu
-
-// Tips for Getting Started: 
-//   1. Use the Solution Explorer window to add/manage files
-//   2. Use the Team Explorer window to connect to source control
-//   3. Use the Output window to see build output and other messages
-//   4. Use the Error List window to view errors
-//   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
-//   6. In the future, to open this project again, go to File > Open > Project and select the .sln file
